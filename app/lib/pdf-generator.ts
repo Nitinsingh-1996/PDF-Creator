@@ -1,14 +1,18 @@
-import puppeteer from "puppeteer";
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
 import { preparePdfHtml } from "@/app/lib/pdf-template";
 
 export async function generatePdfBuffer(rawHtml: string) {
   const processedHtml = preparePdfHtml(rawHtml);
+  chromium.setGraphicsMode = false;
+
   const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-    ],
+    args: await puppeteer.defaultArgs({
+      args: chromium.args,
+      headless: "shell",
+    }),
+    executablePath: await chromium.executablePath(),
+    headless: "shell",
   });
 
   try {
