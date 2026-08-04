@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
+import { generatePdfAction } from "@/app/actions";
 import { preparePdfHtml } from "@/app/lib/pdf-template";
 
 type PdfWorkbenchProps = {
@@ -35,6 +36,28 @@ export default function PdfWorkbench({
     });
   };
 
+  const updatePdfUrl = (base64Pdf: string) => {
+    const byteChars = atob(base64Pdf);
+    const byteNumbers = new Array(byteChars.length);
+
+    for (let index = 0; index < byteChars.length; index += 1) {
+      byteNumbers[index] = byteChars.charCodeAt(index);
+    }
+
+    const blob = new Blob([new Uint8Array(byteNumbers)], {
+      type: "application/pdf",
+    });
+    const nextUrl = URL.createObjectURL(blob);
+
+    setPdfUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+
+      return nextUrl;
+    });
+  };
+
   const generatePdf = async () => {
     if (!html.trim()) {
       return;
@@ -42,29 +65,8 @@ export default function PdfWorkbench({
 
     try {
       setLoading(true);
-
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ html }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF");
-      }
-
-      const blob = await response.blob();
-      const nextUrl = URL.createObjectURL(blob);
-
-      setPdfUrl((currentUrl) => {
-        if (currentUrl) {
-          URL.revokeObjectURL(currentUrl);
-        }
-
-        return nextUrl;
-      });
+      const base64Pdf = await generatePdfAction(html);
+      updatePdfUrl(base64Pdf);
     } catch (error) {
       console.error(error);
       alert("Failed to generate PDF");
@@ -100,7 +102,11 @@ export default function PdfWorkbench({
               </button>
 
               <button
-                onClick={generatePdf}
+                onClick={() => {
+                  startTransition(() => {
+                    void generatePdf();
+                  });
+                }}
                 disabled={!html.trim() || loading}
                 className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-stone-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
